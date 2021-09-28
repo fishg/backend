@@ -19,7 +19,7 @@ def get_servers(db: Session, user: User = None) -> t.List[Server]:
     # Only superuser can see all the servers.
     global cache
     if not user or user.is_superuser:
-        if cache.has_key('supper'):
+        if 'supper' in cache:
             return cache['supper']
         cache['supper'] = (db.query(Server)
             .filter(Server.is_active == True)
@@ -29,8 +29,8 @@ def get_servers(db: Session, user: User = None) -> t.List[Server]:
         )
         return cache['supper']
     key = ''+user.id
-    if cache.has_key(key):
-            return cache[key]
+    if key in cache:
+        return cache[key]
     cache[key] = (
         db.query(Server)
         .filter(
@@ -47,17 +47,12 @@ def get_servers(db: Session, user: User = None) -> t.List[Server]:
 
 
 def get_server(db: Session, server_id: int) -> Server:
-    global cache
-    key = '_server'
-    if cache.has_key(key):
-            return cache[key]
-    cache[key] = (
+    return (
         db.query(Server)
         .filter(and_(Server.id == server_id, Server.is_active == True))
         .options(joinedload(Server.ports).joinedload(Port.allowed_users))
         .first()
     )
-    return cache[key]
 
 
 def get_server_with_ports_usage(db: Session, server_id: int) -> Server:
@@ -78,6 +73,9 @@ def create_server(db: Session, server: ServerCreate) -> Server:
     db.refresh(db_server)
     return db_server
 
+def clear_cache():
+    global cache
+    cache.clear()
 
 def edit_server(
     db: Session, server_id: int, server: ServerEdit, reset_system: bool = False
