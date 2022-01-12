@@ -106,15 +106,18 @@ def ddns_runner():
     with db_session() as db:
         rules = get_all_ddns_rules(db)
     for rule in rules:
+        remote_addr = ''
+        if rule.config.get("remote_address"):
+            remote_addr = rule.config.get("remote_address").strip(' ')
         if (
             rule.config.get("remote_address")
             and rule.config.get("remote_ip")
-            and not is_ip(rule.config.get("remote_address"))
+            and not is_ip(remote_addr)
         ):
-            updated_ip = dns_query(rule.config["remote_address"])
+            updated_ip = dns_query(remote_addr)
             if updated_ip and updated_ip != rule.config["remote_ip"]:
                 print(
-                    f"DNS changed for address {rule.config['remote_address']}, "
+                    f"DNS changed for address {remote_addr}, "
                     + f"{rule.config['remote_ip']}->{updated_ip}"
                 )
                 if rule.method == MethodEnum.IPTABLES:
