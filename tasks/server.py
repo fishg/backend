@@ -30,7 +30,6 @@ def finished_handler(server_id: int, md5: str = None):
             server = get_server(db, server_id)
         facts = runner.get_fact_cache(server.ansible_name)
         update_facts(server.id, facts, md5=md5)
-    clear_cache()
     return wrapper
 
 
@@ -70,3 +69,4 @@ def servers_runner(**kwargs):
     for server in servers:
         if "init" not in server.config or server.config["init"] != init_md5:
             server_runner(server.id, **kwargs)
+    clear_cache()

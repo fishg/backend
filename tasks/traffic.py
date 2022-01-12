@@ -3,7 +3,7 @@ from huey import crontab
 from app.core.config import TRAFFIC_INTERVAL_SECONDS
 from app.db.session import db_session
 from app.db.models.server import Server
-from app.db.crud.server import get_server_with_ports_usage, get_servers
+from app.db.crud.server import get_server_with_ports_usage, get_servers,clear_cache
 
 from .config import huey
 from tasks.utils.runner import run
@@ -27,3 +27,4 @@ def traffic_runner():
         servers = get_servers(db)
     for server in servers:
         traffic_server_runner(server.id)
+    clear_cache()
