@@ -1,5 +1,5 @@
 #!/bin/bash
-
+exit
 # Get default interface
 DEBUG=1
 SUDO=$(if [ $(id -u $whoami) -gt 0 ]; then echo "sudo "; fi)
