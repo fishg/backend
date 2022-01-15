@@ -1,6 +1,6 @@
 ---
 - name: Count bandwidth usage
-  gather_facts: false
+  gather_facts: no
   hosts: "{{ host | default('web') }}"
   become: yes
   roles:

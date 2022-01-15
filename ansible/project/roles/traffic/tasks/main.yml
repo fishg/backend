@@ -1,5 +1,6 @@
 ---
 - name: Exec traffic script
+  gather_facts: no
   block:
     - name: Exec get_traffic script locally
       shell: /usr/local/bin/get_traffic.sh
