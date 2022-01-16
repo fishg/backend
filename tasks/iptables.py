@@ -20,7 +20,7 @@ from tasks.utils.server import iptables_restore_service_enabled
 from tasks.utils.handlers import status_handler, iptables_finished_handler
 
 
-@huey.task(priority=0)
+@huey.task(priority=9)
 def iptables_runner(
     port_id: int,
     server_id: int,
