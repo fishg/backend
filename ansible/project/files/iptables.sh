@@ -110,8 +110,6 @@ Unit=iptables-outipcheck.service
 WantedBy=timers.target
 EOF
 $SUDO systemctl daemon-reload
-$SUDO systemctl enable iptables-outipcheck.service
-$SUDO systemctl start iptables-outipcheck.service
 $SUDO systemctl enable iptables-outipcheck.timer
 $SUDO systemctl start iptables-outipcheck.timer
 }
