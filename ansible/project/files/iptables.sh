@@ -26,15 +26,11 @@ check_system () {
     systemctl --version > /dev/null 2>&1 && IS_SYSTEMD=1
 }
 
-get_ips () {
-    IFACE=$(ip route show | grep default | awk -F 'dev ' '{ print $2; }' | awk '{ print $1; }')
-    INET=$(ip address show $IFACE scope global |  awk '/inet / {split($2,var,"/"); print var[1]}')
-    INET=$(echo $INET | xargs -n 1 | grep -Eo "^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$" | sort -u)
-    [ -z $INET ] && echo "No valid interface ipv4 addresses found" && exit 1
+install_iptables () {
+    iptables -V > /dev/null || $INSTALL iptables || ($UPDATE && $INSTALL iptables) || (echo "Failed to install iptables" && exit 1)
 }
 
-install_deps () {
-    iptables -V > /dev/null || $INSTALL iptables || ($UPDATE && $INSTALL iptables) || (echo "Failed to install iptables" && exit 1)
+install_ip () {
     ip a > /dev/null && return 0
     if [[ $OS_FAMILY == "centos" ]]; then
         $INSTALL iproute || ($UPDATE && $INSTALL iproute) || (echo "Failed to install iproute" && exit 1)
@@ -43,6 +39,14 @@ install_deps () {
     else
         echo "ip command not found" && exit 1
     fi
+}
+
+get_ips () {
+    install_ip || exit 1
+    IFACE=$(ip route show | grep default | awk -F 'dev ' '{ print $2; }' | awk '{ print $1; }')
+    INET=$(ip address show $IFACE scope global |  awk '/inet / {split($2,var,"/"); print var[1]}')
+    INET=$(echo $INET | xargs -n 1 | grep -Eo "^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$" | sort -u)
+    [ -z $INET ] && echo "No valid interface ipv4 addresses found" && exit 1
 }
 
 delete_service () {
@@ -159,7 +163,7 @@ set_forward () {
     fi
     $SUDO sysctl -p > /dev/null
     # check and make sure ip_forward enabled
-    [[ $(cat /proc/sys/net/ipv4/ip_forward) -ne 1 ]] && echo "Cannot enable ipv4 forward for iptables" && exit 1
+    [[ $(cat /proc/sys/net/ipv4/ip_forward) -ne 1 ]] && echo 1 | $SUDO tee /proc/sys/net/ipv4/ip_forward
 }
 
 forward () {
@@ -170,6 +174,7 @@ forward () {
             $SUDO iptables -t nat -A POSTROUTING -d $REMOTE_IP -p tcp --dport $REMOTE_PORT -j SNAT --to-source $SNATIP -m comment --comment "BACKWARD $LOCAL_PORT->$REMOTE_IP:$REMOTE_PORT"
         done
         $SUDO iptables -t nat -A PREROUTING -p tcp --dport $LOCAL_PORT -j DNAT --to-destination $REMOTE_IP:$REMOTE_PORT  -m comment --comment "FORWARD $LOCAL_PORT->$REMOTE_IP:$REMOTE_PORT"
+        # for ipt port traffic monitor
         $SUDO iptables -I FORWARD -p tcp -d $REMOTE_IP --dport $REMOTE_PORT -j ACCEPT -m comment --comment "UPLOAD $LOCAL_PORT->$REMOTE_IP:$REMOTE_PORT"
         $SUDO iptables -I FORWARD -p tcp -s $REMOTE_IP -j ACCEPT -m comment --comment "DOWNLOAD $LOCAL_PORT->$REMOTE_IP:$REMOTE_PORT"
     fi
@@ -179,6 +184,7 @@ forward () {
             $SUDO iptables -t nat -A POSTROUTING -d $REMOTE_IP -p udp --dport $REMOTE_PORT -j SNAT --to-source $SNATIP -m comment --comment "BACKWARD $LOCAL_PORT->$REMOTE_IP:$REMOTE_PORT"
         done
         $SUDO iptables -t nat -A PREROUTING -p udp --dport $LOCAL_PORT -j DNAT --to-destination $REMOTE_IP:$REMOTE_PORT  -m comment --comment "FORWARD $LOCAL_PORT->$REMOTE_IP:$REMOTE_PORT"
+        # for ipt port traffic monitor
         $SUDO iptables -I FORWARD -p udp -d $REMOTE_IP --dport $REMOTE_PORT -j ACCEPT -m comment --comment "UPLOAD-UDP $LOCAL_PORT->$REMOTE_IP:$REMOTE_PORT"
         $SUDO iptables -I FORWARD -p udp -s $REMOTE_IP -j ACCEPT -m comment --comment "DOWNLOAD-UDP $LOCAL_PORT->$REMOTE_IP:$REMOTE_PORT"
     fi
@@ -285,32 +291,34 @@ fi
 [[ -n $1 ]] && OPERATION=$1
 [[ -z $OPERATION ]] && echo "No operation specified" && exit 1
 [[ -n $2 ]] && LOCAL_PORT=$2
-[[ $OPERATION != "check" && "$OPERATION" != "outipcheck" && -z $LOCAL_PORT ]] && echo "Unknow local port for operation $OPERATION" && exit 1
+[[ $OPERATION != "list_all" && "$OPERATION" != "outipcheck" && -z $LOCAL_PORT ]] && echo "Unknow local port for operation $OPERATION" && exit 1
 [[ -n $3 ]] && REMOTE_IP=$3
 REMOTE_IP=$(echo $REMOTE_IP | grep -Eo "^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$")
 [[ $OPERATION == "forward" && -z $REMOTE_IP ]] && echo "Unknow remote ip for operation $OPERATION" && exit 1
 [[ -n $4 ]] && REMOTE_PORT=$4
 [[ $OPERATION == "forward" && -z $REMOTE_PORT ]] && echo "Unknow remote port for operation $OPERATION" && exit 1
 
-# $OPERATION == "check"
 check_system
-install_deps
+install_iptables
 disable_firewall
 check_ipt_service
-[[ $OPERATION == "check" ]] && exit 0
-
 if [[ $OPERATION == "forward" ]]; then
+    # for ipt/app -> ipt traffic get
     list
     delete
     delete_service
     get_ips
     forward
+# for app port traffic monitor
 elif [[ $OPERATION == "monitor" ]]; then
+    # for ipt/app -> ipt traffic get
     list
     delete
     monitor
+# for clean port traffic get
 elif [[ $OPERATION == "list" ]]; then
     list
+# for traffic schedule task
 elif [[ $OPERATION == "list_all" ]]; then
     list_all
 elif [[ $OPERATION == "delete_service" ]]; then
