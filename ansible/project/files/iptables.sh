@@ -319,6 +319,7 @@ elif [[ $OPERATION == "delete" ]]; then
 elif [[ $OPERATION == "reset" ]]; then
     reset
 elif [ $OPERATION == "outipcheck" ]; then
+    get_ips
     outipcheck
 else
     echo "Unrecognized command: $OPERATION"
