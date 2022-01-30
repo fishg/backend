@@ -1,10 +1,9 @@
 from sqlalchemy.orm import Session
 
 from app.db.models.port import Port
-
 from app.db.models.port_forward import MethodEnum
 from app.utils.dns import dns_query
-from app.utils.ip import is_ip
+from app.utils.ip import is_ip, is_ipv6
 from tasks.functions.base import AppConfig
 
 
@@ -26,14 +25,13 @@ class BrookConfig(AppConfig):
 
     def get_app_command(self, db: Session, port: Port):
         command = port.forward_rule.config.get("command")
-        if port.forward_rule.config.get("remote_address"):
-            if not is_ip(port.forward_rule.config.get("remote_address")):
-                remote_ip = dns_query(port.forward_rule.config.get("remote_address"))
-            else:
-                remote_ip = port.forward_rule.config.get("remote_address")
+        if remote_address := port.forward_rule.config.get("remote_address"):
+            remote_ip = dns_query(remote_address)
             port.forward_rule.config['remote_ip'] = remote_ip
             db.add(port.forward_rule)
             db.commit()
+        if is_ipv6(remote_ip):
+            remote_ip = f"[{remote_ip}]"
         if command == "relay":
             args = (
                 f"-f :{port.num} "
