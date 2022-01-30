@@ -254,8 +254,8 @@ outipcheck () {
             in_port=$(echo $snat_info|awk -F'->' '{print $1}')
             target_ip=$(echo $snat_info|awk -F'->|:' '{print $2}')
             target_port=$(echo $snat_info|awk -F'->|:| ' '{print $3}')
-            iptSNATNum=$(echo $snat_info|awk -F'->|:| ' '{print $5}')
-            forwardType=$(echo $snat_info|awk -F'->|:| ' '{print $6}')
+            iptSNATNum=$(echo $snat_info|awk -F'->|:| ' '{print $6}')
+            forwardType=$(echo $snat_info|awk -F'->|:| ' '{print $7}')
             if [[ -n $in_port && -n $target_ip && -n $target_port && -n $iptSNATNum ]]; then
                 # echo "fix outip from $outip to $INET, $in_port -> $target_ip:$target_port"
                 iptables -t nat -D POSTROUTING $iptSNATNum
