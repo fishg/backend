@@ -1,4 +1,5 @@
 import os
+import traceback
 import typing as t
 import ansible_runner
 from uuid import uuid4
@@ -54,11 +55,16 @@ def run(
     else:
         priv_data_dir = prepare_priv_dir(server)
         extravars["host"] = server.ansible_name
-    return ansible_runner.run(
-        ident=uuid4() if ident is None else ident,
-        private_data_dir=priv_data_dir,
-        project_dir="ansible/project",
-        playbook=playbook,
-        extravars=extravars,
-        **kwargs
-    )
+    try:
+        runner = ansible_runner.run(
+            ident=uuid4() if ident is None else ident,
+            private_data_dir=priv_data_dir,
+            project_dir="ansible/project",
+            playbook=playbook,
+            extravars=extravars,
+            **kwargs
+        )
+    except OSError:
+        print(traceback.format_exc())
+        return
+    return runner

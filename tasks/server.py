@@ -61,7 +61,7 @@ def connect_runner(
     )
 
 
-@huey.task(priority=3)
+@huey.task(priority=2)
 def servers_runner(**kwargs):
     with db_session() as db:
         servers = get_servers(db)
