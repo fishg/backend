@@ -90,10 +90,10 @@ install_ipt_service () {
     elif [[ $OS_FAMILY == "debian" ]]; then
         RULE_PATH="/etc/iptables/rules.v4"
     fi
-    [[ -z $RULE_PATH || -f $RULE_PATH ]] && return 0
+    [[ -z $RULE_PATH ]] && return 0
     $SUDO tee /etc/systemd/system/iptables-restore.service > /dev/null <<EOF
 [Unit]
-Description=Restore iptables rule by Aurora Admin Panel
+Description=Restore iptables rules by Aurora Admin Panel
 
 [Service]
 Type=oneshot
@@ -105,37 +105,31 @@ EOF
     check_ipt_restore_file
 }
 
-install_ipt_out_ip_check_service () {
-    $SUDO cat > /etc/systemd/system/iptables-outipcheck.service <<EOF
+install_ipt_timer () {
+    $SUDO tee /etc/systemd/system/iptables-check.service > /dev/null <<EOF
 [Unit]
-Description=iptables out ip changed check by Aurora Admin Panel
+Description=Update iptables snat rules by Aurora Admin Panel
 
 [Service]
-ExecStart=/usr/local/bin/iptables.sh outipcheck
-
+ExecStart=/usr/local/bin/iptables.sh check
 EOF
-$SUDO cat > /etc/systemd/system/iptables-outipcheck.timer <<EOF
+    $SUDO tee /etc/systemd/system/iptables-check.timer > /dev/null <<EOF
 [Unit]
-Description=iptables out ip changed check timer by Aurora Admin Panel
+Description=Update iptables snat rules by Aurora Admin Panel
 
 [Timer]
 OnBootSec=60s
 OnUnitActiveSec=60s
-Unit=iptables-outipcheck.service
+Unit=iptables-check.service
 
 [Install]
 WantedBy=timers.target
 EOF
-$SUDO systemctl daemon-reload
-$SUDO systemctl enable iptables-outipcheck.timer
-$SUDO systemctl start iptables-outipcheck.timer
 }
 
 check_ipt_service () {
     if [[ $IS_SYSTEMD -eq 1 ]]; then
-        # add out ip changed check timer for iptable port forward rules
-        ! systemctl is-enabled --quiet iptables-outipcheck.timer > /dev/null 2>&1 && install_ipt_out_ip_check_service
-        ! systemctl is-enabled --quiet iptables-restore.service > /dev/null 2>&1 && install_ipt_service \
+        ! systemctl is-enabled --quiet iptables-restore.service > /dev/null 2>&1 && install_ipt_service && \
         $SUDO systemctl daemon-reload && \
         $SUDO systemctl enable iptables-restore.service > /dev/null 2>&1
         # systemctl enable output is stderr, use 2>&1 redirection to ignore it
@@ -144,6 +138,14 @@ check_ipt_service () {
     if [[ $IS_OPENRC -eq 1 ]]; then
         rc-update add iptables > /dev/null
     fi
+}
+
+check_ipt_timer () {
+    [[ $IS_SYSTEMD -ne 1 ]] && return 0
+    ! systemctl is-enabled --quiet iptables-check.timer > /dev/null 2>&1 && install_ipt_timer && \
+    $SUDO systemctl daemon-reload && \
+    $SUDO systemctl enable iptables-check.timer > /dev/null 2>&1 && \
+    $SUDO systemctl start iptables-check.timer > /dev/null 2>&1
 }
 
 save_iptables () {
@@ -240,32 +242,24 @@ delete () {
     save_iptables
 }
 
-outipcheck () {
-    # echo "start out interface ip check, now is: $INET"
+check () {
     [ -z $INET ] && echo "No valid interface ipv4 addresses found" && exit 1
-    INETList=(${INET// / })
-    if [[ ${#INETList[*]} -gt 1 ]]; then
-        # auto fix not support in multi ip env.
-        return 0
-    fi
-    for snat_info in $(iptables  -t  nat  -nL --line-number|grep SNAT|grep BACKWARD|awk '{printf("%s:%s:%s:%s\n",$11,$13,$1,$3)}');do
-        outip=$(echo $snat_info|awk -F: '{print $4}')
-        if [ -n "$outip" ]; then
-        if [ "$INET" != $outip ]; then
-            in_port=$(echo $snat_info|awk -F'->' '{print $1}')
-            target_ip=$(echo $snat_info|awk -F'->|:' '{print $2}')
-            target_port=$(echo $snat_info|awk -F'->|:| ' '{print $3}')
-            iptSNATNum=$(echo $snat_info|awk -F'->|:| ' '{print $6}')
-            forwardType=$(echo $snat_info|awk -F'->|:| ' '{print $7}')
-            if [[ -n $in_port && -n $target_ip && -n $target_port && -n $iptSNATNum ]]; then
-                # echo "fix outip from $outip to $INET, $in_port -> $target_ip:$target_port"
-                iptables -t nat -D POSTROUTING $iptSNATNum
-                $SUDO iptables -t nat -A POSTROUTING -d $target_ip -p $forwardType --dport $target_port -j SNAT --to-source $INET -m comment --comment "BACKWARD $in_port->$target_ip:$target_port"
+    # snat update only support one ip for now.
+    [[ $(echo $INET | awk '{print NF}') -gt 1 ]] && return 0
+    SNAT_RULES=$(iptables -t nat -nL POSTROUTING --line-number | grep -E "BACKWARD [[:digit:]]+->" | awk '{ printf("%s:%s:%s:%s\n", $11,$13,$1,$3); }')
+    for SNAT_RULE in $SNAT_RULES; do
+        OUTIP=$(echo $SNAT_RULE | awk -F : '{print $4}')
+        if [[ -n $OUTIP && $INET != $OUTIP ]]; then
+            LOCAL_PORT=$(echo $SNAT_RULE | awk -F '->' '{print $1}')
+            REMOTE_IP=$(echo $SNAT_RULE | awk -F '->|:' '{print $2}')
+            REMOTE_PORT=$(echo $SNAT_RULE | awk -F '->|:| ' '{print $3}')
+            IPT_NUM=$(echo $SNAT_RULE | awk -F '->|:| ' '{print $6}')
+            TYPE=$(echo $SNAT_RULE | awk -F '->|:| ' '{print $7}')
+            if [[ -n $LOCAL_PORT && -n $REMOTE_IP && -n $REMOTE_PORT && -n $IPT_NUM && -n $TYPE ]]; then
+                $SUDO iptables -t nat -R POSTROUTING $IPT_NUM -d $REMOTE_IP -p $TYPE --dport $REMOTE_PORT -j SNAT --to-source $INET -m comment --comment "BACKWARD $LOCAL_PORT->$REMOTE_IP:$REMOTE_PORT"
             fi
         fi
-        fi
     done
-    # echo "end out interface ip check, now is: $INET"
 }
 
 for i in "$@"
@@ -286,7 +280,7 @@ fi
 [[ -n $1 ]] && OPERATION=$1
 [[ -z $OPERATION ]] && echo "No operation specified" && exit 1
 [[ -n $2 ]] && LOCAL_PORT=$2
-[[ $OPERATION != "list_all" && "$OPERATION" != "outipcheck" && ($LOCAL_PORT -ge 65536 || $LOCAL_PORT -lt 0) ]] && \
+[[ $OPERATION != "list_all" && "$OPERATION" != "check" && ($LOCAL_PORT -ge 65536 || $LOCAL_PORT -lt 0) ]] && \
 echo "Unknow local port for operation $OPERATION" && exit 1
 [[ -n $3 ]] && REMOTE_IP=$3
 REMOTE_IP=$(echo $REMOTE_IP | grep -Eo "^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$")
@@ -299,6 +293,7 @@ check_system
 install_iptables
 disable_firewall
 check_ipt_service
+check_ipt_timer
 if [[ $OPERATION == "forward" ]]; then
     # for ipt/app -> ipt traffic get
     list
@@ -324,9 +319,9 @@ elif [[ $OPERATION == "delete" ]]; then
     delete
 elif [[ $OPERATION == "reset" ]]; then
     reset
-elif [ $OPERATION == "outipcheck" ]; then
+elif [ $OPERATION == "check" ]; then
     get_ips
-    outipcheck
+    check
 else
     echo "Unrecognized command: $OPERATION"
     exit 1
