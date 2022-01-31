@@ -29,7 +29,7 @@ class EhcoConfig(AppConfig):
         if is_ipv6(remote_address):
             remote_address = f"[{remote_address}]"
         args = (
-            f"-l 0.0.0.0:{port.num} "
+            f"-l :{port.num} "
             f"--lt {port.forward_rule.config.get('listen_type', 'raw')} "
             f"-r {'wss://' if transport_type.endswith('wss') else ('ws://' if transport_type != 'raw' else '')}"
             f"{remote_address}:{remote_port} "

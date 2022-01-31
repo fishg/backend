@@ -7,6 +7,7 @@ from urllib.error import URLError
 from urllib.parse import urlencode, urlparse
 from urllib.request import Request, urlopen
 
+import dns.resolver
 
 from app.utils.ip import is_ip, is_ipv6
 

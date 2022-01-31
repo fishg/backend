@@ -36,7 +36,7 @@ class TinyPortMapperConfig(AppConfig):
         args = (
             f"--log-level 3 "
             f"--disable-color "
-            f"-l 0.0.0.0:{port.num} "
+            f"-l [::]:{port.num} "
             f"-r {remote_ip}:{port.forward_rule.config.get('remote_port')} "
             f"{'-t ' if relay_type == 'ALL' or relay_type == 'TCP' else ''}"
             f"{'-u ' if relay_type == 'ALL' or relay_type == 'UDP' else ''}"
