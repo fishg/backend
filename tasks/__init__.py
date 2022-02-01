@@ -8,7 +8,7 @@ if config.ENABLE_SENTRY:
     sentry_sdk.init(
         release=f"{config.BACKEND_VERSION}",
         environment=f"{config.ENVIRONMENT}",
-        dsn="https://53100c72e4524e0093425183269dbadd@sentry.leishi.io/3",
+        dsn="https://f320001640444ef1ab2bc739065c4ad6@sentry.660161.xyz/6112405",
         traces_sample_rate=1.0,
     )
     sentry_sdk.set_tag("panel.ip", get_external_ip())

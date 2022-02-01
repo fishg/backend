@@ -217,18 +217,17 @@ def verify_gost_config(
 
     num = port.external_num if port.external_num else port.num
     for node in rule.config.ServeNodes:
-        if node.startswith(":"):
-            if not node.startswith(f":{num}"):
-                raise HTTPException(
-                    status_code=403,
-                    detail=f"Port not allowed, ServeNode: {node}",
-                )
-        else:
-            parsed = urlparse(node)
-            if not parsed.netloc.endswith(str(num)) \
-                and not parsed.path.endswith(str(num)):
-                raise HTTPException(
-                    status_code=403,
-                    detail=f"Port not allowed, ServeNode: {node}",
-                )
+        parsed = urlparse(node)
+        if parsed.scheme.startswith("relay+"):
+            if (len(parsed.path) > 0
+                    and not parsed.path.startswith("/:")
+                    and parsed.netloc.endswith(str(num))):
+                continue
+        elif parsed.scheme.startswith(("tcp", "udp")):
+            if parsed.netloc.endswith(str(num)):
+                continue
+        raise HTTPException(
+            status_code=403,
+            detail=f"Rule {node} is forbidden!",
+        )
     return rule
