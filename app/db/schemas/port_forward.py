@@ -94,6 +94,12 @@ class V2rayConfig(BaseModel):
     routing: t.Optional[t.Dict]
     dns: t.Optional[t.Dict]
 
+class RealmConfig(BaseModel):
+    remote_address: str
+    remote_port: int
+
+    _remote_port = validator("remote_port", allow_reuse=True)(check_port)
+
 
 class BrookConfig(BaseModel):
     command: str
@@ -236,6 +242,7 @@ def check_config(config: t.Dict, values: t.Dict) -> t.Union[
         WstunnelConfig,
         EhcoConfig,
         BrookConfig,
+        RealmConfig,
         IptablesConfig,
         SocatConfig,
         IperfConfig,
@@ -255,6 +262,7 @@ class PortForwardRuleCreate(PortForwardRuleBase):
         WstunnelConfig,
         EhcoConfig,
         BrookConfig,
+        RealmConfig,
         IptablesConfig,
         SocatConfig,
         IperfConfig,
@@ -276,6 +284,7 @@ class PortForwardRuleEdit(BaseModel):
         WstunnelConfig,
         EhcoConfig,
         BrookConfig,
+        RealmConfig,
         IptablesConfig,
         SocatConfig,
         IperfConfig,

@@ -28,6 +28,9 @@ def clean_port_runner(
     server_id: int, port: Port, update_traffic: bool = True
 ):
     with db_session() as db:
+        if db_forward_rule := get_forward_rule(db, server_id, port.id):
+            db.delete(db_forward_rule)
+            db.commit()
         server = get_server_with_ports_usage(db, server_id)
         if db_forward_rule := get_forward_rule(db, server_id, port.id):
             db.delete(db_forward_rule)
