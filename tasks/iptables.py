@@ -11,7 +11,7 @@ from app.db.crud.port import get_port
 from app.db.crud.port_forward import get_all_ddns_rules
 from app.core.config import DDNS_INTERVAL_SECONDS
 from app.utils.dns import dns_query
-from app.utils.ip import is_ip
+from app.utils.ip import is_ip, is_ipv6
 
 from .config import huey
 from tasks.app import rule_runner
@@ -42,7 +42,11 @@ def iptables_runner(
                 port.forward_rule.config["remote_ip"] = remote_ip
                 db.add(port.forward_rule)
                 db.commit()
-                args = f" -t={forward_type} forward {local_port} {remote_ip} {remote_port}"
+                args = (
+                    f" -t={forward_type}"
+                    f" {'-v=6' if is_ipv6(remote_ip) else '-v=4'}"
+                    f" forward {local_port} {remote_ip} {remote_port}"
+                )
             else:
                 args = f" list {local_port}"
             server = get_server_with_ports_usage(db, server_id)
