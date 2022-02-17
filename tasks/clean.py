@@ -27,9 +27,7 @@ def clean_runner(server: t.Dict):
 
 
 @huey.task(priority=4)
-def clean_port_runner(
-    server_id: int, port: Port, update_traffic: bool = True
-):
+def clean_port_runner(server_id: int, port: Port, update_traffic: bool = True):
     with db_session() as db:
         if db_forward_rule := get_forward_rule(db, server_id, port.id):
             db.delete(db_forward_rule)
@@ -48,12 +46,12 @@ def clean_port_runner(
     )
 
 
-@huey.periodic_task(crontab(minute="*/1"), priority=4)
+@huey.periodic_task(crontab(minute="*"), priority=4)
 def clean_expired_port_runner():
     with db_session() as db:
         db_expire_rules = get_all_expire_rules(db)
     for db_rule in db_expire_rules:
-        if time.time() > db_rule.config.get("expire_time", float('inf')):
+        if time.time() > db_rule.config.get("expire_time", float("inf")):
             clean_port_runner(
                 db_rule.port.server.id,
                 db_rule.port,

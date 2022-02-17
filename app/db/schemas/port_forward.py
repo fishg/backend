@@ -80,7 +80,7 @@ class GostConfig(BaseModel):
 
 class IperfConfig(BaseModel):
     expire_second: int
-    expire_time: t.Optional[float]
+    expire_time: t.Optional[int]
 
     @validator("expire_second", pre=True)
     def check_expire_second(cls, v):
