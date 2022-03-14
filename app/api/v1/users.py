@@ -69,9 +69,9 @@ async def users_list(
                 )
                 user["upload_usage"] += port["port"]["usage"].get("upload", 0)
         user["readable_download_usage"] = get_readable_size(
-            user["download_usage"]
+            user["download_usage"]+user["upload_usage"]
         )
-        user["readable_upload_usage"] = get_readable_size(user["upload_usage"])
+        user["readable_upload_usage"] = get_readable_size(user["upload_usage"]+user["download_usage"])
         users_with_usage.append(user)
     return users_with_usage
 

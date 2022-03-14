@@ -19,11 +19,11 @@ class PortUsageOut(PortUsageBase):
 
     @validator("readable_download", pre=True, always=True)
     def default_readable_download(cls, v, *, values, **kwargs):
-        return v or get_readable_size(values["download"])
+        return v or get_readable_size(values["download"]+values["upload"])
 
     @validator("readable_upload", pre=True, always=True)
     def default_readable_upload(cls, v, *, values, **kwargs):
-        return v or get_readable_size(values["upload"])
+        return v or get_readable_size(values["upload"]+values["download"])
 
 
 class PortUsageCreate(PortUsageBase):
